@@ -1,5 +1,5 @@
 # Design Token Transformer
-
+Related Confluence article here: https://unbounce.atlassian.net/wiki/x/A4Dt1g
 ## Installation
 ### 1. Download or clone the repo to your computer
 
@@ -11,7 +11,6 @@ git clone https://github.com/unbounce/design-token-transformer.git
 2. Run `npm i` to install the dependencies.
 
 ## Usage
-### Option 1: Local transformation
 To use an exported JSON file and transform it locally on your machine, follow the 3 steps below:
 
 1. Save the `.json` file you exported using the [Design Token](https://github.com/lukasoppermann/design-tokens) plugin to the [`tokens` folder](./tokens/) (and remove the example files).
