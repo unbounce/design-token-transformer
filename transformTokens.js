@@ -79,6 +79,60 @@ StyleDictionary.registerTransform({
   },
 });
 
+// Register transform for RGB values
+StyleDictionary.registerTransform({
+  name: "color/rgb",
+  type: "value",
+  matcher: (token) => token.type === "color",
+  transformer: (token) => {
+    let r, g, b;
+    if (typeof token.value === "string" && token.value.startsWith("#")) {
+      // HEX format
+      const hex = token.value.replace("#", "");
+      const bigint = parseInt(hex, 16);
+      r = (bigint >> 16) & 255;
+      g = (bigint >> 8) & 255;
+      b = bigint & 255;
+    } else if (
+      typeof token.value === "string" &&
+      token.value.startsWith("rgb(")
+    ) {
+      // rgb() format
+      [r, g, b] = token.value
+        .replace(/[^\d,]/g, "")
+        .split(",")
+        .map(Number);
+    } else {
+      // fallback
+      r = g = b = 0;
+    }
+    return `${r}, ${g}, ${b}`;
+  },
+});
+
+// Register a generic format for both RGB and HEX variables
+StyleDictionary.registerFormat({
+  name: "variables-with-rgb-and-hex",
+  formatter: ({ dictionary }) => {
+    return dictionary.allTokens
+      .map((token) => {
+        // Only output -rgb for primitive colors
+        const isPrimitive =
+          token.type === "color" &&
+          token.extensions &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"] &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].collection === "Primitives";
+
+        if (isPrimitive) {
+          const rgbValue = StyleDictionary.transform["color/rgb"].transformer(token);
+          return `--${token.name}-rgb: ${rgbValue};\n--${token.name}: ${token.value};`;
+        }
+        return `--${token.name}: ${token.value};`;
+      })
+      .join("\n");
+  },
+});
+
 // Extend Style Dictionary with your custom configurations and token sources
 const StyleDictionaryExtended = StyleDictionary.extend({
   ...deepMerge.all([androidConfig, webConfig]),
@@ -91,7 +145,7 @@ const StyleDictionaryExtended = StyleDictionary.extend({
       files: [
         {
           destination: "_variables.scss",
-          format: "scss/variables",
+          format: "variables-with-rgb-and-hex",
           filter: "validToken",
         },
       ],
@@ -102,7 +156,7 @@ const StyleDictionaryExtended = StyleDictionary.extend({
       files: [
         {
           destination: "_variables.less",
-          format: "less/variables",
+          format: "variables-with-rgb-and-hex",
           filter: "validToken",
         },
       ],
@@ -113,7 +167,7 @@ const StyleDictionaryExtended = StyleDictionary.extend({
       files: [
         {
           destination: "_variables.css",
-          format: "css/variables",
+          format: "variables-with-rgb-and-hex",
           filter: "validToken",
           options: {
             showFileHeader: false,
