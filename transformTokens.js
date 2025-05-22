@@ -114,7 +114,7 @@ StyleDictionary.registerTransform({
 StyleDictionary.registerFormat({
   name: "variables-with-rgb-and-hex",
   formatter: ({ dictionary }) => {
-    return dictionary.allTokens
+    const variables = dictionary.allTokens
       .map((token) => {
         // Only output -rgb for primitive colors
         const isPrimitive =
@@ -125,12 +125,31 @@ StyleDictionary.registerFormat({
 
         if (isPrimitive) {
           const rgbValue = StyleDictionary.transform["color/rgb"].transformer(token);
-          return `--${token.name}-rgb: ${rgbValue};\n--${token.name}: ${token.value};`;
+          return `  --${token.name}-rgb: ${rgbValue};\n  --${token.name}: ${token.value};`;
         }
-        return `--${token.name}: ${token.value};`;
+        return `  --${token.name}: ${token.value};`;
       })
       .join("\n");
+    return `:root {\n${variables}\n}`;
   },
+});
+
+// Register format for Less variables
+StyleDictionary.registerFormat({
+  name: "less/variables",
+  formatter: ({ dictionary }) =>
+    dictionary.allTokens
+      .map((token) => `@${token.name}: ${token.value};`)
+      .join("\n"),
+});
+
+// Register format for SCSS variables
+StyleDictionary.registerFormat({
+  name: "scss/variables",
+  formatter: ({ dictionary }) =>
+    dictionary.allTokens
+      .map((token) => `$${token.name}: ${token.value};`)
+      .join("\n"),
 });
 
 // Extend Style Dictionary with your custom configurations and token sources
@@ -139,14 +158,16 @@ const StyleDictionaryExtended = StyleDictionary.extend({
   source: ["tokens/*.json"],
   platforms: {
     scss: {
-      // This transform group uses the "name/cti/kebab" we've overridden above.
       transformGroup: "custom/css",
       buildPath: "build/scss/",
       files: [
         {
           destination: "_variables.scss",
-          format: "variables-with-rgb-and-hex",
+          format: "scss/variables",
           filter: "validToken",
+          options: {
+            showFileHeader: true, // Remove header if desired
+          },
         },
       ],
     },
@@ -156,8 +177,11 @@ const StyleDictionaryExtended = StyleDictionary.extend({
       files: [
         {
           destination: "_variables.less",
-          format: "variables-with-rgb-and-hex",
+          format: "less/variables",
           filter: "validToken",
+          options: {
+            showFileHeader: true, // Remove header if desired
+          },
         },
       ],
     },
