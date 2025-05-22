@@ -79,20 +79,148 @@ StyleDictionary.registerTransform({
   },
 });
 
+// Register transform for RGB values
+StyleDictionary.registerTransform({
+  name: "color/rgb",
+  type: "value",
+  matcher: (token) => token.type === "color",
+  transformer: (token) => {
+    let r, g, b;
+    if (typeof token.value === "string" && token.value.startsWith("#")) {
+      // HEX format
+      const hex = token.value.replace("#", "");
+      const bigint = parseInt(hex, 16);
+      r = (bigint >> 16) & 255;
+      g = (bigint >> 8) & 255;
+      b = bigint & 255;
+    } else if (
+      typeof token.value === "string" &&
+      token.value.startsWith("rgb(")
+    ) {
+      // rgb() format
+      [r, g, b] = token.value
+        .replace(/[^\d,]/g, "")
+        .split(",")
+        .map(Number);
+    } else {
+      // fallback
+      r = g = b = 0;
+    }
+    return `${r}, ${g}, ${b}`;
+  },
+});
+
+// Register format for Less variables
+StyleDictionary.registerFormat({
+  name: "less/variables",
+  formatter: ({ dictionary }) =>
+    dictionary.allTokens
+      .map((token) => `@${token.name}: ${token.value};`)
+      .join("\n"),
+});
+
+// Register format for Less variables with RGB
+StyleDictionary.registerFormat({
+  name: "less/variables-with-rgb",
+  formatter: ({ dictionary }) =>
+    dictionary.allTokens
+      .map((token) => {
+        const isPrimitive =
+          token.type === "color" &&
+          token.extensions &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"] &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].collection === "Primitives";
+        // Exclude shadow primitive colors (EFFECT_COLOR in scopes)
+        const isShadow =
+          isPrimitive &&
+          Array.isArray(token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes) &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes.includes("EFFECT_COLOR");
+        if (isPrimitive && !isShadow) {
+          const rgbValue = StyleDictionary.transform["color/rgb"].transformer(token);
+          return `@${token.name}-rgb: ${rgbValue};\n@${token.name}: ${token.value};`;
+        }
+        return `@${token.name}: ${token.value};`;
+      })
+      .join("\n"),
+});
+
+// Register format for SCSS variables
+StyleDictionary.registerFormat({
+  name: "scss/variables",
+  formatter: ({ dictionary }) =>
+    dictionary.allTokens
+      .map((token) => `$${token.name}: ${token.value};`)
+      .join("\n"),
+});
+
+// Register format for SCSS variables with RGB
+StyleDictionary.registerFormat({
+  name: "scss/variables-with-rgb",
+  formatter: ({ dictionary }) =>
+    dictionary.allTokens
+      .map((token) => {
+        const isPrimitive =
+          token.type === "color" &&
+          token.extensions &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"] &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].collection === "Primitives";
+        // Exclude shadow primitive colors (EFFECT_COLOR in scopes)
+        const isShadow =
+          isPrimitive &&
+          Array.isArray(token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes) &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes.includes("EFFECT_COLOR");
+        if (isPrimitive && !isShadow) {
+          const rgbValue = StyleDictionary.transform["color/rgb"].transformer(token);
+          return `$${token.name}-rgb: ${rgbValue};\n$${token.name}: ${token.value};`;
+        }
+        return `$${token.name}: ${token.value};`;
+      })
+      .join("\n"),
+});
+
+// Register a generic format for both RGB and HEX variables (CSS)
+StyleDictionary.registerFormat({
+  name: "variables-with-rgb-and-hex",
+  formatter: ({ dictionary }) => {
+    const variables = dictionary.allTokens
+      .map((token) => {
+        const isPrimitive =
+          token.type === "color" &&
+          token.extensions &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"] &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].collection === "Primitives";
+        // Exclude shadow primitive colors (EFFECT_COLOR in scopes)
+        const isShadow =
+          isPrimitive &&
+          Array.isArray(token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes) &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes.includes("EFFECT_COLOR");
+        if (isPrimitive && !isShadow) {
+          const rgbValue = StyleDictionary.transform["color/rgb"].transformer(token);
+          return `  --${token.name}-rgb: ${rgbValue};\n  --${token.name}: ${token.value};`;
+        }
+        return `  --${token.name}: ${token.value};`;
+      })
+      .join("\n");
+    return `:root {\n${variables}\n}`;
+  },
+});
+
 // Extend Style Dictionary with your custom configurations and token sources
 const StyleDictionaryExtended = StyleDictionary.extend({
   ...deepMerge.all([androidConfig, webConfig]),
   source: ["tokens/*.json"],
   platforms: {
     scss: {
-      // This transform group uses the "name/cti/kebab" we've overridden above.
       transformGroup: "custom/css",
       buildPath: "build/scss/",
       files: [
         {
           destination: "_variables.scss",
-          format: "scss/variables",
+          format: "scss/variables-with-rgb",
           filter: "validToken",
+          options: {
+            showFileHeader: true,
+          },
         },
       ],
     },
@@ -102,8 +230,11 @@ const StyleDictionaryExtended = StyleDictionary.extend({
       files: [
         {
           destination: "_variables.less",
-          format: "less/variables",
+          format: "less/variables-with-rgb",
           filter: "validToken",
+          options: {
+            showFileHeader: true,
+          },
         },
       ],
     },
@@ -113,10 +244,10 @@ const StyleDictionaryExtended = StyleDictionary.extend({
       files: [
         {
           destination: "_variables.css",
-          format: "css/variables",
+          format: "variables-with-rgb-and-hex",
           filter: "validToken",
           options: {
-            showFileHeader: false,
+            showFileHeader: true,
           },
         },
       ],
