@@ -110,36 +110,37 @@ StyleDictionary.registerTransform({
   },
 });
 
-// Register a generic format for both RGB and HEX variables
-StyleDictionary.registerFormat({
-  name: "variables-with-rgb-and-hex",
-  formatter: ({ dictionary }) => {
-    const variables = dictionary.allTokens
-      .map((token) => {
-        // Only output -rgb for primitive colors
-        const isPrimitive =
-          token.type === "color" &&
-          token.extensions &&
-          token.extensions["org.lukasoppermann.figmaDesignTokens"] &&
-          token.extensions["org.lukasoppermann.figmaDesignTokens"].collection === "Primitives";
-
-        if (isPrimitive) {
-          const rgbValue = StyleDictionary.transform["color/rgb"].transformer(token);
-          return `  --${token.name}-rgb: ${rgbValue};\n  --${token.name}: ${token.value};`;
-        }
-        return `  --${token.name}: ${token.value};`;
-      })
-      .join("\n");
-    return `:root {\n${variables}\n}`;
-  },
-});
-
 // Register format for Less variables
 StyleDictionary.registerFormat({
   name: "less/variables",
   formatter: ({ dictionary }) =>
     dictionary.allTokens
       .map((token) => `@${token.name}: ${token.value};`)
+      .join("\n"),
+});
+
+// Register format for Less variables with RGB
+StyleDictionary.registerFormat({
+  name: "less/variables-with-rgb",
+  formatter: ({ dictionary }) =>
+    dictionary.allTokens
+      .map((token) => {
+        const isPrimitive =
+          token.type === "color" &&
+          token.extensions &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"] &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].collection === "Primitives";
+        // Exclude shadow primitive colors (EFFECT_COLOR in scopes)
+        const isShadow =
+          isPrimitive &&
+          Array.isArray(token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes) &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes.includes("EFFECT_COLOR");
+        if (isPrimitive && !isShadow) {
+          const rgbValue = StyleDictionary.transform["color/rgb"].transformer(token);
+          return `@${token.name}-rgb: ${rgbValue};\n@${token.name}: ${token.value};`;
+        }
+        return `@${token.name}: ${token.value};`;
+      })
       .join("\n"),
 });
 
@@ -150,6 +151,58 @@ StyleDictionary.registerFormat({
     dictionary.allTokens
       .map((token) => `$${token.name}: ${token.value};`)
       .join("\n"),
+});
+
+// Register format for SCSS variables with RGB
+StyleDictionary.registerFormat({
+  name: "scss/variables-with-rgb",
+  formatter: ({ dictionary }) =>
+    dictionary.allTokens
+      .map((token) => {
+        const isPrimitive =
+          token.type === "color" &&
+          token.extensions &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"] &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].collection === "Primitives";
+        // Exclude shadow primitive colors (EFFECT_COLOR in scopes)
+        const isShadow =
+          isPrimitive &&
+          Array.isArray(token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes) &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes.includes("EFFECT_COLOR");
+        if (isPrimitive && !isShadow) {
+          const rgbValue = StyleDictionary.transform["color/rgb"].transformer(token);
+          return `$${token.name}-rgb: ${rgbValue};\n$${token.name}: ${token.value};`;
+        }
+        return `$${token.name}: ${token.value};`;
+      })
+      .join("\n"),
+});
+
+// Register a generic format for both RGB and HEX variables (CSS)
+StyleDictionary.registerFormat({
+  name: "variables-with-rgb-and-hex",
+  formatter: ({ dictionary }) => {
+    const variables = dictionary.allTokens
+      .map((token) => {
+        const isPrimitive =
+          token.type === "color" &&
+          token.extensions &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"] &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].collection === "Primitives";
+        // Exclude shadow primitive colors (EFFECT_COLOR in scopes)
+        const isShadow =
+          isPrimitive &&
+          Array.isArray(token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes) &&
+          token.extensions["org.lukasoppermann.figmaDesignTokens"].scopes.includes("EFFECT_COLOR");
+        if (isPrimitive && !isShadow) {
+          const rgbValue = StyleDictionary.transform["color/rgb"].transformer(token);
+          return `  --${token.name}-rgb: ${rgbValue};\n  --${token.name}: ${token.value};`;
+        }
+        return `  --${token.name}: ${token.value};`;
+      })
+      .join("\n");
+    return `:root {\n${variables}\n}`;
+  },
 });
 
 // Extend Style Dictionary with your custom configurations and token sources
@@ -163,10 +216,10 @@ const StyleDictionaryExtended = StyleDictionary.extend({
       files: [
         {
           destination: "_variables.scss",
-          format: "scss/variables",
+          format: "scss/variables-with-rgb",
           filter: "validToken",
           options: {
-            showFileHeader: true, // Remove header if desired
+            showFileHeader: true,
           },
         },
       ],
@@ -177,10 +230,10 @@ const StyleDictionaryExtended = StyleDictionary.extend({
       files: [
         {
           destination: "_variables.less",
-          format: "less/variables",
+          format: "less/variables-with-rgb",
           filter: "validToken",
           options: {
-            showFileHeader: true, // Remove header if desired
+            showFileHeader: true,
           },
         },
       ],
@@ -194,7 +247,7 @@ const StyleDictionaryExtended = StyleDictionary.extend({
           format: "variables-with-rgb-and-hex",
           filter: "validToken",
           options: {
-            showFileHeader: false,
+            showFileHeader: true,
           },
         },
       ],
