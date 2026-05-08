@@ -1,0 +1,44 @@
+name: Agentic PR Reviewer
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.guard.outputs.should_run }}
+    steps:
+      - id: guard
+        env:
+          IS_DEPENDABOT: ${{ github.actor == 'dependabot[bot]' }}
+          IS_DRAFT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true }}
+          IS_PR_COMMENT: ${{ github.event_name == 'issue_comment' && github.event.issue.pull_request != null && startsWith(github.event.comment.body, '/pr-review') }}
+          IS_PR_EVENT: ${{ github.event_name == 'pull_request' }}
+        run: |
+          if [[ "$IS_DEPENDABOT" == "true" || "$IS_DRAFT_PR" == "true" ]]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$IS_PR_EVENT" == "true" || "$IS_PR_COMMENT" == "true" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  review:
+    needs: check
+    if: needs.check.outputs.should_run == 'true'
+    uses: unbounce/agentic-tools/.github/workflows/reviewer.yml@v1
+    with:
+      skill_paths: skills/reviewer/SKILL.md
+    secrets: inherit
