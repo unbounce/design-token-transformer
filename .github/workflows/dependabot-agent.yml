@@ -1,0 +1,21 @@
+name: Dependabot Agent
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+  checks: read
+
+jobs:
+  dependabot:
+    if: |
+      github.actor == 'dependabot[bot]' &&
+      startsWith(github.event.pull_request.head.ref, 'dependabot/')
+    uses: unbounce/agentic-tools/.github/workflows/dependabot-agent.yml@v1
+    with:
+      slack_channel: ''
+    secrets: inherit
